@@ -31,7 +31,7 @@ export default function Home() {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState(false);
   const [url, setUrl] = useState("");
-  const [emailCount, setEmailCount] = useState(4);
+  const [emailCount, setEmailCount] = useState(1);
   const [context, setContext] = useState("");
   const [beforeImage, setBeforeImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
