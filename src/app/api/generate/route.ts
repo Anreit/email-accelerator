@@ -123,7 +123,44 @@ Before generating, THINK about the business:
 - Brand personality in every line of copy — not generic
 - Trust bar with specific, believable stats
 - Educational/content section that adds value
-- Looks like it was designed in Figma and hand-coded by a senior email developer`;
+- Looks like it was designed in Figma and hand-coded by a senior email developer
+
+## CRITICAL DESIGN RULES:
+- Hero background should use the brand's PRIMARY accent color (not dark/black) — if they have a green, use green. If red, use red. White text on the colored bg.
+- Product sections should have WHITE backgrounds — clean, airy, lots of padding
+- Product cards on light gray (#f3f3f3) backgrounds with rounded corners
+- Only the trust bar and footer should be dark (#222)
+- The overall email should feel LIGHT and CLEAN — white is the dominant color, with the brand accent for hero and CTAs
+- DO NOT make the email feel dark or moody unless the brand explicitly calls for it
+
+## REFERENCE EXAMPLE — follow this exact section pattern:
+
+Section 1: Logo header (white bg, centered logo img, 24px padding)
+Section 2: Hero (BRAND ACCENT COLOR bg, white text)
+  - Overline: small uppercase tracked label like "WELCOME TO THE FAMILY"
+  - Headline: 40px bold, e.g. "Your first order? 20% off."
+  - Subtext: 15px, lighter shade
+  - Discount code box: white bg rounded box ON the colored hero — "Your code" label + "WELCOME20" in large bold brand color
+  - CTA button: white bg, brand color text, uppercase
+Section 3: Full-width banner image (0 padding, edge to edge, real lifestyle image from their site)
+Section 4: Brand circles row (white bg)
+  - Overline: "Brands you'll love"
+  - 4 brand logos in a row (round images or brand imagery from the site)
+Section 5: Product headline (white bg)
+  - "Here's what most people start with."
+  - Subtext: "Our all-time bestsellers"
+Section 6: Product cards (white bg, 3-column)
+  - Each card: #f3f3f3 bg, border-radius:8px, product image 140px, product name bold, subtitle, price in brand color, "Shop Now →" link
+Section 7: Featured product block (white bg)
+  - Gray (#f3f3f3) inner card with larger product image, overline + headline + description + CTA link
+Section 8: Full-width promo banner (another real image from site, edge to edge)
+Section 9: Trust bar (dark #222 bg)
+  - 3 columns: stat number in brand accent color + gray uppercase label
+  - E.g. "25+" / "Years in business" | "1M+" / "Customers" | "Free" / "Shipping over $40"
+Section 10: Why us section (white bg, 3-column)
+  - Each: icon/image from site + bold headline + description
+Section 11: Educational content (gray bg with blog image + text + CTA)
+Section 12: Footer (dark #222 bg, company info, unsubscribe, legal)`;
 
     const userPrompt = `Generate ${count} production-ready HTML email templates for this company:
 
