@@ -20,6 +20,24 @@ const LOADING_MESSAGES = [
   "Almost there...",
 ];
 
+const FUN_FACTS = [
+  "The first email marketing blast was sent in 1978 by Gary Thuerk to 400 people — it generated $13 million in sales.",
+  "Email marketing has an average ROI of $36 for every $1 spent — the highest of any marketing channel.",
+  "Over 4.5 billion people use email worldwide. That's more than all social media platforms combined.",
+  "Tuesday and Thursday are statistically the best days to send marketing emails.",
+  "Personalized subject lines increase open rates by 26% on average.",
+  "The word 'free' in a subject line used to trigger spam filters. Modern algorithms are much smarter now.",
+  "Segmented email campaigns drive 760% more revenue than one-size-fits-all blasts.",
+  "The average office worker receives 121 emails per day. Standing out matters.",
+  "Emails with emojis in the subject line have a 56% higher open rate.",
+  "Cart abandonment emails recover an average of 10% of lost revenue.",
+  "Welcome emails generate 320% more revenue per email than other promotional emails.",
+  "Mobile devices account for 60% of all email opens. Mobile-first design isn't optional.",
+  "Adding a single CTA button instead of text links can increase clicks by 28%.",
+  "The 'From' name is the #1 reason people decide whether to open an email.",
+  "Email has been around since 1971 — it's older than the internet itself.",
+];
+
 type GeneratedEmail = {
   type: string;
   subject: string;
@@ -40,23 +58,30 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
+  const [factIndex, setFactIndex] = useState(0);
   const loadingInterval = useRef<NodeJS.Timeout | null>(null);
+  const factInterval = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (loading) {
       setLoadingMsgIndex(0);
+      setFactIndex(Math.floor(Math.random() * FUN_FACTS.length));
       loadingInterval.current = setInterval(() => {
         setLoadingMsgIndex((prev) => {
-          // Stop at "Almost there..." (last message)
           if (prev >= LOADING_MESSAGES.length - 1) return prev;
           return prev + 1;
         });
       }, 4000);
+      factInterval.current = setInterval(() => {
+        setFactIndex((prev) => (prev + 1) % FUN_FACTS.length);
+      }, 7000);
     } else {
       if (loadingInterval.current) clearInterval(loadingInterval.current);
+      if (factInterval.current) clearInterval(factInterval.current);
     }
     return () => {
       if (loadingInterval.current) clearInterval(loadingInterval.current);
+      if (factInterval.current) clearInterval(factInterval.current);
     };
   }, [loading]);
 
@@ -388,6 +413,31 @@ export default function Home() {
                 }}
               >
                 {error}
+              </div>
+            )}
+
+            {/* Did you know — shown during loading */}
+            {loading && (
+              <div
+                className="mt-6 p-5 rounded-lg text-center"
+                style={{
+                  background: "rgba(63,74,175,0.08)",
+                  border: "1px solid rgba(63,74,175,0.15)",
+                }}
+              >
+                <div
+                  className="text-[10px] font-bold tracking-[1.5px] uppercase mb-2"
+                  style={{ color: "var(--blue)", fontFamily: "var(--font-heading)" }}
+                >
+                  Did you know?
+                </div>
+                <div
+                  key={factIndex}
+                  className="text-sm leading-relaxed step-animate"
+                  style={{ color: "var(--dark-gray)" }}
+                >
+                  {FUN_FACTS[factIndex]}
+                </div>
               </div>
             )}
           </div>
