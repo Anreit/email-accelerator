@@ -95,13 +95,13 @@ REUSABLE MODULE INVENTORY (choose modules that fit the email purpose):
 - footer (dark, company info, unsubscribe, legal)
 
 PURPOSE-TO-LAYOUT MAP:
-- welcome → Hero-Led Conversion or Category Selector
-- promo/sale → Hero-Led Conversion or Offer/Utility
-- launch → Hero-Led Conversion or Long Campaign Stack
-- bestseller → Product Grid Driver
-- bundle → Category Selector or Product Grid
-- editorial → Editorial Story-Led
-- winback → Offer/Utility or Hero-Led
+- welcome : Hero-Led Conversion or Category Selector
+- promo/sale : Hero-Led Conversion or Offer/Utility
+- launch : Hero-Led Conversion or Long Campaign Stack
+- bestseller : Product Grid Driver
+- bundle : Category Selector or Product Grid
+- editorial : Editorial Story-Led
+- winback: Offer/Utility or Hero-Led`;
 
     const userPrompt = `Generate ${count} production-ready HTML email templates for this company:
 
