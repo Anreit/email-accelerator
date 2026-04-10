@@ -31,7 +31,7 @@ export default function Home() {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState(false);
   const [url, setUrl] = useState("");
-  const [emailCount, setEmailCount] = useState(1);
+  const emailCount = 1;
   const [context, setContext] = useState("");
   const [beforeImage, setBeforeImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -263,36 +263,6 @@ export default function Home() {
                   border: "1px solid rgba(255,255,255,0.1)",
                 }}
               />
-            </div>
-
-            {/* Email count */}
-            <div className="mb-6">
-              <label
-                className="block text-xs font-semibold mb-3 tracking-wide uppercase"
-                style={{ color: "var(--dark-gray)" }}
-              >
-                Number of emails
-              </label>
-              <div className="flex gap-2">
-                {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setEmailCount(n)}
-                    className="flex-1 py-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer"
-                    style={{
-                      fontFamily: "var(--font-heading)",
-                      background:
-                        emailCount === n
-                          ? "var(--blue)"
-                          : "rgba(255,255,255,0.05)",
-                      color: emailCount === n ? "white" : "var(--dark-gray)",
-                      border: `1px solid ${emailCount === n ? "var(--blue)" : "rgba(255,255,255,0.1)"}`,
-                    }}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Context */}
