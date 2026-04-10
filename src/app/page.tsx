@@ -1,65 +1,424 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+
+type GeneratedEmail = {
+  type: string;
+  subject: string;
+  html: string;
+};
 
 export default function Home() {
+  const [url, setUrl] = useState("");
+  const [emailCount, setEmailCount] = useState(4);
+  const [context, setContext] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<string | null>(null);
+  const [emails, setEmails] = useState<GeneratedEmail[]>([]);
+  const [activeTab, setActiveTab] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGenerate = async () => {
+    if (!url.trim()) return;
+    setLoading(true);
+    setError(null);
+    setEmails([]);
+
+    try {
+      // Step 1: Scrape
+      setStep("Analyzing website...");
+      const scrapeRes = await fetch("/api/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      if (!scrapeRes.ok) throw new Error("Failed to analyze website");
+      const brandData = await scrapeRes.json();
+
+      // Step 2: Generate
+      setStep("Generating email templates...");
+      const generateRes = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brandData,
+          emailCount,
+          context: context.trim(),
+        }),
+      });
+      if (!generateRes.ok) throw new Error("Failed to generate emails");
+      const { emails: generated } = await generateRes.json();
+
+      setEmails(generated);
+      setActiveTab(0);
+      setStep(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setStep(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadHtml = (email: GeneratedEmail) => {
+    const blob = new Blob([email.html], { type: "text/html" });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = `${email.type.toLowerCase().replace(/\s+/g, "-")}.html`;
+    a.click();
+    URL.revokeObjectURL(blobUrl);
+  };
+
+  const openInNewTab = (email: GeneratedEmail) => {
+    const blob = new Blob([email.html], { type: "text/html" });
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, "_blank");
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="gradient-bg min-h-screen">
+      {/* Header */}
+      <header className="px-8 py-4 flex items-center justify-between border-b border-white/5">
+        <div
+          className="text-[11px] font-bold tracking-[2.5px] uppercase"
+          style={{ fontFamily: "var(--font-heading)", color: "var(--blue)" }}
+        >
+          scandiweb &middot; Email Accelerator
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="text-xs" style={{ color: "var(--dark-gray)" }}>
+          Powered by Claude AI
         </div>
-      </main>
+      </header>
+
+      {/* Hero + Form */}
+      {emails.length === 0 && (
+        <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 relative z-10">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <div
+              className="inline-block px-4 py-1.5 rounded-full text-[10px] font-bold tracking-[2px] uppercase mb-6"
+              style={{
+                fontFamily: "var(--font-heading)",
+                color: "var(--green)",
+                background: "rgba(110,247,110,0.1)",
+                border: "1px solid rgba(110,247,110,0.2)",
+              }}
+            >
+              Instant email templates
+            </div>
+            <h1
+              className="text-5xl font-extrabold leading-tight mb-4"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              Drop a URL,{" "}
+              <span style={{ color: "var(--green)" }}>get emails</span>
+            </h1>
+            <p className="text-base" style={{ color: "var(--dark-gray)" }}>
+              Paste any website. We&apos;ll scrape their branding, products, and
+              style — then generate production-ready HTML email templates in
+              seconds.
+            </p>
+          </div>
+
+          <div
+            className="w-full max-w-xl rounded-2xl p-8"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              backdropFilter: "blur(20px)",
+            }}
+          >
+            {/* URL input */}
+            <div className="mb-6">
+              <label
+                className="block text-xs font-semibold mb-2 tracking-wide uppercase"
+                style={{ color: "var(--dark-gray)" }}
+              >
+                Company website
+              </label>
+              <input
+                type="url"
+                placeholder="https://www.example.com"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                className="glow-input w-full px-4 py-3.5 rounded-lg text-white text-sm font-medium outline-none transition-all"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                }}
+              />
+            </div>
+
+            {/* Email count */}
+            <div className="mb-6">
+              <label
+                className="block text-xs font-semibold mb-3 tracking-wide uppercase"
+                style={{ color: "var(--dark-gray)" }}
+              >
+                Number of emails
+              </label>
+              <div className="flex gap-2">
+                {[2, 3, 4, 5, 6].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setEmailCount(n)}
+                    className="flex-1 py-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer"
+                    style={{
+                      fontFamily: "var(--font-heading)",
+                      background:
+                        emailCount === n
+                          ? "var(--blue)"
+                          : "rgba(255,255,255,0.05)",
+                      color: emailCount === n ? "white" : "var(--dark-gray)",
+                      border: `1px solid ${emailCount === n ? "var(--blue)" : "rgba(255,255,255,0.1)"}`,
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Context */}
+            <div className="mb-8">
+              <label
+                className="block text-xs font-semibold mb-2 tracking-wide uppercase"
+                style={{ color: "var(--dark-gray)" }}
+              >
+                Context{" "}
+                <span className="normal-case tracking-normal font-normal">
+                  (optional)
+                </span>
+              </label>
+              <textarea
+                placeholder="E.g. Focus on welcome + cart abandon flows, they sell premium skincare to women 25-45, want a luxurious feel..."
+                value={context}
+                onChange={(e) => setContext(e.target.value)}
+                rows={3}
+                className="glow-input w-full px-4 py-3 rounded-lg text-white text-sm outline-none transition-all resize-none"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                }}
+              />
+            </div>
+
+            {/* Generate button */}
+            <button
+              onClick={handleGenerate}
+              disabled={loading || !url.trim()}
+              className={`w-full py-4 rounded-lg text-base font-bold transition-all cursor-pointer ${!loading && url.trim() ? "pulse-btn" : ""}`}
+              style={{
+                fontFamily: "var(--font-heading)",
+                background:
+                  loading || !url.trim()
+                    ? "rgba(255,255,255,0.05)"
+                    : "var(--green)",
+                color:
+                  loading || !url.trim() ? "var(--dark-gray)" : "var(--dark)",
+              }}
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-3">
+                  <svg
+                    className="animate-spin h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeDasharray="31.4 31.4"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  {step}
+                </span>
+              ) : (
+                "Generate Emails"
+              )}
+            </button>
+
+            {error && (
+              <div
+                className="mt-4 p-3 rounded-lg text-sm text-center"
+                style={{
+                  background: "rgba(255,90,49,0.1)",
+                  color: "var(--orange)",
+                }}
+              >
+                {error}
+              </div>
+            )}
+          </div>
+
+          {/* Features */}
+          <div className="grid grid-cols-3 gap-6 mt-16 max-w-2xl">
+            {[
+              {
+                icon: "1",
+                title: "Paste URL",
+                desc: "We scrape logo, colors, fonts, products",
+              },
+              {
+                icon: "2",
+                title: "AI generates",
+                desc: "Production-ready HTML with real content",
+              },
+              {
+                icon: "3",
+                title: "Use immediately",
+                desc: "Download HTML or preview in browser",
+              },
+            ].map((f) => (
+              <div key={f.icon} className="text-center">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 text-sm font-bold"
+                  style={{
+                    fontFamily: "var(--font-heading)",
+                    background: "rgba(63,74,175,0.15)",
+                    color: "var(--blue)",
+                  }}
+                >
+                  {f.icon}
+                </div>
+                <div
+                  className="text-sm font-bold mb-1"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  {f.title}
+                </div>
+                <div className="text-xs" style={{ color: "var(--dark-gray)" }}>
+                  {f.desc}
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+      )}
+
+      {/* Results */}
+      {emails.length > 0 && (
+        <main className="flex-1 relative z-10">
+          {/* Results header */}
+          <div className="text-center py-10 px-6">
+            <h2
+              className="text-3xl font-extrabold mb-2"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              <span style={{ color: "var(--green)" }}>{emails.length}</span>{" "}
+              emails generated
+            </h2>
+            <p className="text-sm" style={{ color: "var(--dark-gray)" }}>
+              Click each tab to preview. Download or open in a new tab.
+            </p>
+            <button
+              onClick={() => {
+                setEmails([]);
+                setStep(null);
+              }}
+              className="mt-4 text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer"
+              style={{
+                color: "var(--blue)",
+                background: "rgba(63,74,175,0.1)",
+              }}
+            >
+              &larr; Generate more
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div
+            className="flex gap-0 justify-center border-b mx-8"
+            style={{ borderColor: "rgba(255,255,255,0.08)" }}
+          >
+            {emails.map((email, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveTab(i)}
+                className="px-6 py-3 text-sm font-semibold transition-all relative cursor-pointer"
+                style={{
+                  fontFamily: "var(--font-heading)",
+                  color:
+                    activeTab === i ? "var(--green)" : "var(--dark-gray)",
+                }}
+              >
+                {email.type}
+                {activeTab === i && (
+                  <span
+                    className="absolute bottom-0 left-0 right-0 h-0.5"
+                    style={{ background: "var(--green)" }}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Active email preview */}
+          {emails[activeTab] && (
+            <div className="flex flex-col items-center py-10 px-6">
+              <div className="mb-4 text-center">
+                <div
+                  className="text-lg font-bold"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  {emails[activeTab].type}
+                </div>
+                <div
+                  className="text-xs mt-1"
+                  style={{ color: "var(--dark-gray)" }}
+                >
+                  Subject: {emails[activeTab].subject}
+                </div>
+              </div>
+
+              {/* Phone mockup */}
+              <div className="phone-mockup">
+                <div className="phone-screen">
+                  <div className="phone-status-bar">9:41</div>
+                  <div className="phone-scroll">
+                    <iframe
+                      srcDoc={emails[activeTab].html}
+                      style={{ height: "2400px" }}
+                      title={emails[activeTab].type}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => openInNewTab(emails[activeTab])}
+                  className="px-6 py-3 rounded-lg text-sm font-bold transition-all cursor-pointer"
+                  style={{
+                    fontFamily: "var(--font-heading)",
+                    background: "var(--blue)",
+                    color: "white",
+                  }}
+                >
+                  Open full email &nearr;
+                </button>
+                <button
+                  onClick={() => downloadHtml(emails[activeTab])}
+                  className="px-6 py-3 rounded-lg text-sm font-bold transition-all cursor-pointer"
+                  style={{
+                    fontFamily: "var(--font-heading)",
+                    background: "rgba(255,255,255,0.05)",
+                    color: "var(--dark-gray)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                  }}
+                >
+                  Download HTML
+                </button>
+              </div>
+            </div>
+          )}
+        </main>
+      )}
     </div>
   );
 }
