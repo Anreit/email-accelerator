@@ -9,6 +9,9 @@ type GeneratedEmail = {
 };
 
 export default function Home() {
+  const [authed, setAuthed] = useState(false);
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState(false);
   const [url, setUrl] = useState("");
   const [emailCount, setEmailCount] = useState(4);
   const [context, setContext] = useState("");
@@ -17,6 +20,20 @@ export default function Home() {
   const [emails, setEmails] = useState<GeneratedEmail[]>([]);
   const [activeTab, setActiveTab] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async () => {
+    const res = await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    if (res.ok) {
+      setAuthed(true);
+      setAuthError(false);
+    } else {
+      setAuthError(true);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!url.trim()) return;
@@ -30,7 +47,7 @@ export default function Home() {
       const scrapeRes = await fetch("/api/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: url.trim(), password }),
       });
       if (!scrapeRes.ok) throw new Error("Failed to analyze website");
       const brandData = await scrapeRes.json();
@@ -44,6 +61,7 @@ export default function Home() {
           brandData,
           emailCount,
           context: context.trim(),
+          password,
         }),
       });
       if (!generateRes.ok) throw new Error("Failed to generate emails");
@@ -75,6 +93,65 @@ export default function Home() {
     const blobUrl = URL.createObjectURL(blob);
     window.open(blobUrl, "_blank");
   };
+
+  if (!authed) {
+    return (
+      <div className="gradient-bg min-h-screen flex items-center justify-center px-6">
+        <div className="w-full max-w-sm text-center">
+          <div
+            className="text-[11px] font-bold tracking-[2.5px] uppercase mb-8"
+            style={{ fontFamily: "var(--font-heading)", color: "var(--blue)" }}
+          >
+            scandiweb &middot; Email Accelerator
+          </div>
+          <h1
+            className="text-2xl font-extrabold mb-2"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            Enter password
+          </h1>
+          <p className="text-sm mb-8" style={{ color: "var(--dark-gray)" }}>
+            This tool is for internal use only.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleLogin();
+            }}
+          >
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="glow-input w-full px-4 py-3.5 rounded-lg text-white text-sm font-medium outline-none transition-all mb-4 text-center"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: `1px solid ${authError ? "var(--orange)" : "rgba(255,255,255,0.1)"}`,
+              }}
+              autoFocus
+            />
+            {authError && (
+              <div className="text-xs mb-4" style={{ color: "var(--orange)" }}>
+                Wrong password
+              </div>
+            )}
+            <button
+              type="submit"
+              className="w-full py-3.5 rounded-lg text-sm font-bold cursor-pointer"
+              style={{
+                fontFamily: "var(--font-heading)",
+                background: "var(--blue)",
+                color: "white",
+              }}
+            >
+              Continue
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="gradient-bg min-h-screen">

@@ -18,11 +18,17 @@ type BrandData = {
 
 export async function POST(request: Request) {
   try {
-    const { brandData, emailCount, context } = (await request.json()) as {
+    const { brandData, emailCount, context, password } = (await request.json()) as {
       brandData: BrandData;
       emailCount: number;
       context: string;
+      password: string;
     };
+
+    const correctPw = process.env.APP_PASSWORD || "scandiweb2026";
+    if (password !== correctPw) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     if (!brandData?.url) {
       return NextResponse.json(

@@ -3,7 +3,13 @@ import * as cheerio from "cheerio";
 
 export async function POST(request: Request) {
   try {
-    const { url } = await request.json();
+    const { url, password } = await request.json();
+
+    const correctPw = process.env.APP_PASSWORD || "scandiweb2026";
+    if (password !== correctPw) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     if (!url) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
     }
