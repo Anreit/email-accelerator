@@ -66,30 +66,42 @@ DESIGN REQUIREMENTS:
 - Overall feel: LIGHT and CLEAN. White is the dominant background color.
 - Hero: brand accent color background (NOT dark/black) with white text, or full-width lifestyle image
 - Product sections: white background, generous padding
-- Product cards: light gray bg (#f3f3f3), border-radius:8px, product image, name, price, CTA link
+- Product cards: light gray bg (#f3f3f3), border-radius matching brand style, product image (140px), name, price in accent color, CTA link
 - Full-width lifestyle/banner images from the site between content sections (0 padding, edge to edge)
 - Trust bar: dark bg (#222), 3-column stats in accent color
 - Footer: dark bg, company info, unsubscribe
+- Use real lifestyle/banner images from scraped data as section breaks — these make the email feel professional
+- Minimum 3-4 real images per email. Text-only sections are the exception.
 
-ADAPT TO THE BRAND:
-- Beauty/luxury: serif headlines (Georgia), warm body bg (#FDF6F4), soft radius (12px), lifestyle photography
-- Sports/active: bold sans-serif (Montserrat/Barlow), uppercase headlines, sharp radius (4px), action photography
+ADAPT TO THE BRAND (critical — do not use one-size-fits-all):
+- Beauty/luxury: serif display font (Georgia), warm body bg (#FDF6F4), soft radius (12-16px), lifestyle model photography, elegant light font-weight (400)
+- Sports/active: bold sans-serif display font (Montserrat/Barlow 700-900), neutral bg (#f2f2f2), sharp radius (4-6px), action/lifestyle photography, uppercase headlines
 - General retail: clean sans-serif, neutral bg (#f3f3f3), medium radius (8px)
-- Use TWO font roles: display font for headlines + sans-serif for body text
+- ALWAYS use TWO font roles: display/headline font + body font (Arial/Helvetica fallback)
 
-SECTION ORDER (adapt based on brand, but include most of these):
-1. Preheader
-2. Logo header
-3. Hero (accent color bg + headline + CTA/discount code)
-4. Full-width lifestyle banner
-5. Product/category headline
-6. Product grid (2-3 columns) or category cards
-7. Featured product or discovery block
-8. Second banner or brand logos row
-9. Trust bar (dark, 3-column stats)
-10. Why us / USP section (3-column, white bg)
-11. Educational/blog content (optional)
-12. Footer (dark)`;
+REUSABLE MODULE INVENTORY (choose modules that fit the email purpose):
+- preheader, logo header, alert/warning bars
+- hero sections (colored bg OR full-width image)
+- full-width image rows (lifestyle banners, promotional graphics)
+- product hero cards (single featured product, larger)
+- double/triple product card grids
+- image-text split blocks (image left, text right or vice versa)
+- icon stats / benefits blocks (3-column, icon + label + description)
+- promo code boxes (on colored bg)
+- CTA rows (single primary, or split dual-path)
+- category cards (2-3 column with lifestyle images)
+- brand logo rows (4-5 brand images in a row)
+- editorial/blog content blocks (image + headline + copy + link)
+- footer (dark, company info, unsubscribe, legal)
+
+PURPOSE-TO-LAYOUT MAP:
+- welcome → Hero-Led Conversion or Category Selector
+- promo/sale → Hero-Led Conversion or Offer/Utility
+- launch → Hero-Led Conversion or Long Campaign Stack
+- bestseller → Product Grid Driver
+- bundle → Category Selector or Product Grid
+- editorial → Editorial Story-Led
+- winback → Offer/Utility or Hero-Led
 
     const userPrompt = `Generate ${count} production-ready HTML email templates for this company:
 
