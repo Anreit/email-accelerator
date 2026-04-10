@@ -40,61 +40,56 @@ export async function POST(request: Request) {
 
     const count = Math.min(Math.max(emailCount || 4, 1), 8);
 
-    const systemPrompt = `You are an expert email marketing developer. You generate production-ready HTML email templates.
+    const systemPrompt = `You are a world-class email marketing developer at a top e-commerce agency. You generate production-ready HTML email templates that look like they were designed by a professional email designer and coded by a senior developer.
 
-## Rules for HTML emails:
-- Use TABLE-BASED layout (not divs) for email client compatibility
-- ALL styles must be INLINE — no external stylesheets, no <style> blocks except for @media queries
+## Technical rules:
+- TABLE-BASED layout (not divs) — email client compatibility is critical
+- ALL styles INLINE — no external stylesheets. Only <style> block allowed is @media queries
 - 640px max container width
-- Mobile responsive: add @media (max-width: 640px) breakpoints with .container { width: 100% !important; } and .stack { display: block !important; width: 100% !important; }
-- Use the client's brand colors, logo, and fonts with safe fallbacks (Arial, Helvetica, sans-serif)
-- Hotlink product images directly from the client's website (already scraped)
-- Include proper email DOCTYPE and HTML structure
-- Include preheader text
-- Every email needs: header with logo, hero section, main content, CTA button, footer with unsubscribe
+- Mobile responsive @media queries: .container { width: 100% !important; } .stack { display: block !important; width: 100% !important; } .mobile-pad { padding-left: 20px !important; padding-right: 20px !important; } .banner-img { width: 100% !important; height: auto !important; } .product-card { display: block !important; width: 100% !important; }
+- Use client's brand colors, logo, fonts (with Arial/Helvetica fallbacks)
+- Hotlink images directly from client's website
+- Use &nbsp; spacer divs for vertical spacing (email-safe)
+- CTA buttons MUST use the table-cell pattern (not just <a> tags)
 
-## Structure reference (table-based email):
-\`\`\`html
-<!doctype html>
-<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="x-ua-compatible" content="ie=edge">
-  <meta name="x-apple-disable-message-reformatting">
-  <title>Email Title</title>
-  <style>
-    @media only screen and (max-width: 640px) {
-      .container { width: 100% !important; }
-      .stack { display: block !important; width: 100% !important; }
-      .mobile-pad { padding-left: 20px !important; padding-right: 20px !important; }
-    }
-  </style>
-</head>
-<body style="margin:0; padding:0; background-color:#f3f3f3;">
-  <!-- Preheader -->
-  <div style="display:none; max-height:0; overflow:hidden;">Preheader text here</div>
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f3f3f3;">
-    <tr><td align="center" style="padding:20px 0;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="640" class="container" style="width:640px; max-width:640px; margin:0 auto; background-color:#ffffff;">
-        <!-- Header with logo -->
-        <!-- Hero section -->
-        <!-- Content -->
-        <!-- CTA -->
-        <!-- Footer -->
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>
-\`\`\`
+## REQUIRED sections — EVERY email must have ALL of these (8-12 sections minimum):
+1. **Preheader** — hidden preview text, specific and compelling
+2. **Logo header** — centered logo from their site
+3. **Hero section** — bold colored background, large headline, subtext, primary CTA button
+4. **Full-width lifestyle/banner image** — use a real image from their site
+5. **Product grid** — 2-3 column product cards with images, names, prices, individual "Shop Now" links
+6. **Secondary content block** — discovery section, featured category, or educational content
+7. **Trust bar** — dark background, 3-column stats (years in business, customers served, shipping)
+8. **Social proof / Why us section** — 3-column with icons, trust signals, USPs
+9. **Footer** — dark background, company info, unsubscribe link, legal text
 
-## Important:
-- Make emails feel REAL and professional — like a top e-commerce brand would send
-- Use actual product names and images from the scraped data
-- Create compelling copy, not generic placeholder text
-- Each email should be a COMPLETE, ready-to-send template
-- CTA buttons should use table-based button pattern for email client support`;
+## Design quality requirements:
+- Use proper visual hierarchy: overline labels (small, uppercase, tracked), large headlines, body text
+- Use the brand's primary color for hero backgrounds and CTA buttons
+- Product cards should have background-color containers (light gray #f3f3f3), rounded corners, product image, name, price, and "Shop Now →" link
+- Include full-width banner images between content sections for visual breaks
+- Trust bar should feel premium: dark background (#222), green/accent stat numbers, gray labels
+- Make the discount code stand out: white box on colored background, code in large bold text
+- Footer should include: company name, address, unsubscribe link, privacy policy link
+- Each email should be 300-400 lines of HTML — rich and detailed, not minimal
+
+## What makes a BAD email (AVOID):
+- Only 3-4 sections with generic text
+- No product images or real product names
+- Simple colored rectangles with text
+- Generic CTAs like "Shop Now" with no context
+- Missing trust signals, social proof, or brand personality
+- Under 200 lines of HTML
+
+## What makes a GREAT email (AIM FOR THIS):
+- 8+ distinct visual sections
+- Real product images with prices from the scraped data
+- Full-width lifestyle banners breaking up content
+- A visible discount code in a styled box
+- Brand personality in the copy
+- Trust bar with specific stats
+- Educational/content section
+- Looks like it was designed in Figma and hand-coded`;
 
     const userPrompt = `Generate ${count} production-ready HTML email templates for this company:
 
@@ -124,7 +119,7 @@ IMPORTANT: Return ONLY valid JSON — no markdown, no code fences, no explanatio
 
     const message = await client.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 16000,
+      max_tokens: 32000,
       messages: [{ role: "user", content: userPrompt }],
       system: systemPrompt,
     });
