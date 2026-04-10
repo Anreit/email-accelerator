@@ -294,8 +294,11 @@ IMPORTANT: The HTML above is the GOLD STANDARD. Your output MUST match this leve
 - **Logo URL:** ${brandData.logo || "No logo found"}
 - **Brand colors:** ${brandData.colors.length > 0 ? brandData.colors.join(", ") : "Use professional defaults"}
 - **Fonts:** ${brandData.fonts.length > 0 ? brandData.fonts.join(", ") : "Use Arial/Helvetica"}
+- **Brand tone/category:** ${(brandData as Record<string, unknown>).brandTone || "general e-commerce"}
+- **Product categories on site:** ${(brandData as Record<string, unknown>).categories ? ((brandData as Record<string, unknown>).categories as string[]).join(", ") : "Unknown"}
+- **Pages scraped:** ${(brandData as Record<string, unknown>).pagesScraped ? JSON.stringify((brandData as Record<string, unknown>).pagesScraped) : "homepage only"}
 - **Products found:**
-${brandData.products.length > 0 ? brandData.products.map((p) => `  - ${p.name}${p.price ? ` (${p.price})` : ""}${p.image ? ` [img: ${p.image}]` : ""}`).join("\n") : "  - No products scraped, generate appropriate content based on the brand"}
+${brandData.products.length > 0 ? brandData.products.map((p) => `  - ${p.name}${p.price ? ` (${p.price})` : ""}${p.image ? ` [img: ${p.image}]` : ""}${"url" in p && p.url ? ` [link: ${p.url}]` : ""}`).join("\n") : "  - No products scraped, generate appropriate content based on the brand"}
 - **Banner images (use for full-width sections):** ${!Array.isArray(brandData.images) && brandData.images?.banners ? brandData.images.banners.join(", ") : "None found"}
 - **Brand/category logos:** ${!Array.isArray(brandData.images) && brandData.images?.brandLogos ? brandData.images.brandLogos.join(", ") : "None found"}
 - **Trust/about icons:** ${!Array.isArray(brandData.images) && brandData.images?.trustIcons ? brandData.images.trustIcons.join(", ") : "None found"}

@@ -62,7 +62,9 @@ export async function POST(request: Request) {
 
     const baseOrigin = new URL(targetUrl).origin;
 
-    // ── Deep scrape: fetch homepage + discover additional pages ──
+    // ═══════════════════════════════════════════════
+    // STEP 1: Fetch homepage and discover site structure
+    // ═══════════════════════════════════════════════
     const homepageHtml = await fetchPage(targetUrl);
     if (!homepageHtml) {
       return NextResponse.json(
@@ -73,75 +75,105 @@ export async function POST(request: Request) {
 
     const $ = cheerio.load(homepageHtml);
 
-    // Find about page and bestsellers/collections page links
-    const aboutPaths = ["/about", "/about-us", "/pages/about", "/pages/about-us"];
-    const bestsellerPaths = ["/bestsellers", "/collections/bestsellers", "/collections/all", "/nicotine-pouches/bestsellers"];
-
-    // Try to find internal links that match common patterns
+    // Collect ALL internal links from homepage (nav, footer, body)
     const internalLinks = new Set<string>();
     $("a[href]").each((_, el) => {
       const href = $(el).attr("href") || "";
-      if (href.startsWith("/") && !href.startsWith("//")) {
-        internalLinks.add(href.split("?")[0].split("#")[0]);
+      const resolved = href.startsWith("/") ? baseOrigin + href : href;
+      if (resolved.startsWith(baseOrigin) && !resolved.includes("#") && !resolved.includes("?")) {
+        internalLinks.add(resolved.split("?")[0]);
       }
     });
 
+    // ═══════════════════════════════════════════════
+    // STEP 2: Discover and fetch key pages in parallel
+    // ═══════════════════════════════════════════════
+    const linksArray = Array.from(internalLinks);
+
     // Find about page
-    let aboutHtml: string | null = null;
-    for (const path of aboutPaths) {
-      const match = Array.from(internalLinks).find(
-        (l) => l.toLowerCase().includes("about")
+    const aboutUrl = linksArray.find((l) => {
+      const path = l.replace(baseOrigin, "").toLowerCase();
+      return path.includes("/about") || path.includes("/our-story") || path.includes("/story");
+    });
+
+    // Find collection/category pages (bestsellers, shop all, categories)
+    const collectionUrls = linksArray.filter((l) => {
+      const path = l.replace(baseOrigin, "").toLowerCase();
+      return (
+        path.includes("/bestseller") ||
+        path.includes("/best-seller") ||
+        path.includes("/collections") ||
+        path.includes("/shop") ||
+        path.includes("/products") ||
+        path.includes("/catalog") ||
+        path.includes("/category") ||
+        path.includes("/all")
       );
-      const tryPath = match || path;
-      aboutHtml = await fetchPage(baseOrigin + tryPath);
-      if (aboutHtml) break;
+    }).slice(0, 3);
+
+    // Find blog page
+    const blogUrl = linksArray.find((l) => {
+      const path = l.replace(baseOrigin, "").toLowerCase();
+      return path.includes("/blog") || path.includes("/journal") || path.includes("/magazine");
+    });
+
+    // Fetch all discovered pages in parallel
+    const pagePromises: Promise<{ type: string; html: string | null }>[] = [];
+
+    if (aboutUrl) pagePromises.push(fetchPage(aboutUrl).then((html) => ({ type: "about", html })));
+    for (const cu of collectionUrls) {
+      pagePromises.push(fetchPage(cu).then((html) => ({ type: "collection", html })));
     }
+    if (blogUrl) pagePromises.push(fetchPage(blogUrl).then((html) => ({ type: "blog", html })));
 
-    // Find bestsellers/collection page
-    let bestsellersHtml: string | null = null;
-    for (const path of bestsellerPaths) {
-      const match = Array.from(internalLinks).find(
-        (l) => l.toLowerCase().includes("bestseller") || l.toLowerCase().includes("best-seller")
-      );
-      const tryPath = match || path;
-      bestsellersHtml = await fetchPage(baseOrigin + tryPath);
-      if (bestsellersHtml) break;
-    }
+    const fetchedPages = await Promise.all(pagePromises);
 
-    // ── Extract brand data from all pages ──
+    const aboutHtml = fetchedPages.find((p) => p.type === "about")?.html || null;
+    const collectionPages = fetchedPages.filter((p) => p.type === "collection" && p.html).map((p) => p.html!);
+    const blogHtml = fetchedPages.find((p) => p.type === "blog")?.html || null;
 
-    // Company name
+    // ═══════════════════════════════════════════════
+    // STEP 3: Extract brand identity
+    // ═══════════════════════════════════════════════
     const name = extractCompanyName($, targetUrl);
-
-    // Logo
     const logo = extractLogo($, targetUrl);
-
-    // Colors from homepage
     const colors = extractColors($, homepageHtml);
-
-    // Fonts
     const fonts = extractFonts($, homepageHtml);
+    const description = extractDescription($);
 
-    // Products from homepage first, then try bestsellers page
+    // Detect brand tone from body background, overall color scheme
+    const bodyBg = $("body").attr("style")?.match(/background[^;]*#([0-9a-fA-F]{6})/)?.[1];
+    const brandTone = detectBrandTone(colors, bodyBg || null, description);
+
+    // ═══════════════════════════════════════════════
+    // STEP 4: Extract REAL products with prices from multiple pages
+    // ═══════════════════════════════════════════════
     let products = extractProducts($, targetUrl);
-    if (bestsellersHtml && products.length < 6) {
-      const $bs = cheerio.load(bestsellersHtml);
-      const bsProducts = extractProducts($bs, targetUrl);
-      // Merge, dedup by name
-      const existingNames = new Set(products.map((p) => p.name));
-      for (const p of bsProducts) {
-        if (!existingNames.has(p.name)) {
+
+    // Also try collection pages for more/better products
+    for (const collHtml of collectionPages) {
+      const $c = cheerio.load(collHtml);
+      const collProducts = extractProducts($c, targetUrl);
+      const existingNames = new Set(products.map((p) => p.name.toLowerCase()));
+      for (const p of collProducts) {
+        if (!existingNames.has(p.name.toLowerCase()) && p.price) {
           products.push(p);
-          existingNames.add(p.name);
+          existingNames.add(p.name.toLowerCase());
         }
       }
     }
+
+    // Prioritize products that have both image AND price
+    products.sort((a, b) => {
+      const aScore = (a.image ? 2 : 0) + (a.price ? 1 : 0);
+      const bScore = (b.image ? 2 : 0) + (b.price ? 1 : 0);
+      return bScore - aScore;
+    });
     products = products.slice(0, 8);
 
-    // Description
-    const description = extractDescription($);
-
-    // ── Deep image collection ──
+    // ═══════════════════════════════════════════════
+    // STEP 5: Deep image collection from ALL pages
+    // ═══════════════════════════════════════════════
     const allImages: Record<string, string[]> = {
       banners: [],
       brandLogos: [],
@@ -151,81 +183,60 @@ export async function POST(request: Request) {
       productImages: [],
     };
 
-    // Collect ALL image URLs from homepage
-    const allSrcs = new Set<string>();
-    $("img").each((_, el) => {
-      const src = $(el).attr("src");
-      if (src) allSrcs.add(resolveUrl(src, targetUrl));
-    });
-    // Also check CSS backgrounds and srcset
-    $("[style]").each((_, el) => {
-      const style = $(el).attr("style") || "";
-      const bgMatch = style.match(/url\(['"]?([^'")\s]+)['"]?\)/);
-      if (bgMatch) allSrcs.add(resolveUrl(bgMatch[1], targetUrl));
-    });
+    // Collect images from homepage
+    collectImagesFromPage($, targetUrl, allImages);
 
-    // Categorize images by path patterns
-    for (const imgUrl of allSrcs) {
-      if (imgUrl.includes("loader") || imgUrl.includes("pixel") || imgUrl.includes("tracking") || imgUrl.includes("1x1")) continue;
-
-      if (imgUrl.includes("/media/wysiwyg/") && (imgUrl.includes("Skinny") || imgUrl.includes("Banner") || imgUrl.includes("banner") || imgUrl.includes("hero") || imgUrl.includes("Hero") || imgUrl.includes("Steal") || imgUrl.includes("PlayOff") || imgUrl.includes("Deal"))) {
-        allImages.banners.push(imgUrl);
-      } else if (imgUrl.includes("/media/wysiwyg/") && (imgUrl.includes("Radiobutton") || imgUrl.includes("radiobutton") || imgUrl.includes("brand"))) {
-        allImages.brandLogos.push(imgUrl);
-      } else if (imgUrl.includes("/media/wysiwyg/") && (imgUrl.includes("About") || imgUrl.includes("about") || imgUrl.includes("usp") || imgUrl.includes("trust"))) {
-        allImages.trustIcons.push(imgUrl);
-      } else if (imgUrl.includes("/media/magefan_blog/") || imgUrl.includes("/blog/")) {
-        allImages.blogImages.push(imgUrl);
-      } else if (imgUrl.includes("/media/wysiwyg/") && (imgUrl.includes(".jpg") || imgUrl.includes(".jpeg") || imgUrl.includes(".png")) && !imgUrl.includes("icon") && !imgUrl.includes("Icon")) {
-        allImages.lifestyleImages.push(imgUrl);
-      } else if (imgUrl.includes("/media/catalog/product/")) {
-        allImages.productImages.push(imgUrl);
-      }
-    }
-
-    // Also scrape about page for trust icons
+    // Collect images from about page
     if (aboutHtml) {
       const $about = cheerio.load(aboutHtml);
-      $about("img").each((_, el) => {
-        const src = $about(el).attr("src");
+      collectImagesFromPage($about, targetUrl, allImages);
+    }
+
+    // Collect images from blog page
+    if (blogHtml) {
+      const $blog = cheerio.load(blogHtml);
+      $blog("img").each((_, el) => {
+        const src = $blog(el).attr("src");
         if (!src) return;
         const resolved = resolveUrl(src, targetUrl);
-        if (resolved.includes("About") || resolved.includes("about") || resolved.includes("usp") || resolved.includes("competitive") || resolved.includes("product_range") || resolved.includes("shopping_experience")) {
-          if (!allImages.trustIcons.includes(resolved)) {
-            allImages.trustIcons.push(resolved);
-          }
-        }
-        if (resolved.includes("about-page") || resolved.includes("hero")) {
-          if (!allImages.lifestyleImages.includes(resolved)) {
-            allImages.lifestyleImages.push(resolved);
-          }
+        if (resolved.includes("blog") || resolved.includes("magefan") || resolved.includes("journal") || resolved.includes("article")) {
+          if (!allImages.blogImages.includes(resolved)) allImages.blogImages.push(resolved);
+        } else if (isLikelyLifestyleImage(resolved)) {
+          if (!allImages.lifestyleImages.includes(resolved)) allImages.lifestyleImages.push(resolved);
         }
       });
     }
 
-    // Collect blog images from homepage blog section
-    $("a[href*='blog'] img, [class*='blog'] img").each((_, el) => {
-      const src = $(el).attr("src");
-      if (src) {
-        const resolved = resolveUrl(src, targetUrl);
-        if (!allImages.blogImages.includes(resolved)) {
-          allImages.blogImages.push(resolved);
-        }
+    // Verify top images actually load (parallel)
+    const verifyPromises: Promise<{ url: string; ok: boolean; type: string }>[] = [];
+    for (const banner of allImages.banners.slice(0, 5)) {
+      verifyPromises.push(checkImageUrl(banner).then((ok) => ({ url: banner, ok, type: "banner" })));
+    }
+    for (const icon of allImages.trustIcons.slice(0, 5)) {
+      verifyPromises.push(checkImageUrl(icon).then((ok) => ({ url: icon, ok, type: "trust" })));
+    }
+    for (const blog of allImages.blogImages.slice(0, 4)) {
+      verifyPromises.push(checkImageUrl(blog).then((ok) => ({ url: blog, ok, type: "blog" })));
+    }
+    for (const lifestyle of allImages.lifestyleImages.slice(0, 4)) {
+      verifyPromises.push(checkImageUrl(lifestyle).then((ok) => ({ url: lifestyle, ok, type: "lifestyle" })));
+    }
+
+    const verifyResults = await Promise.all(verifyPromises);
+    const verified: Record<string, string[]> = { banners: [], trustIcons: [], blogImages: [], lifestyleImages: [] };
+    for (const r of verifyResults) {
+      if (r.ok) {
+        if (r.type === "banner") verified.banners.push(r.url);
+        else if (r.type === "trust") verified.trustIcons.push(r.url);
+        else if (r.type === "blog") verified.blogImages.push(r.url);
+        else if (r.type === "lifestyle") verified.lifestyleImages.push(r.url);
       }
-    });
-
-    // Verify top banner images actually load
-    const verifiedBanners: string[] = [];
-    for (const banner of allImages.banners.slice(0, 4)) {
-      const ok = await checkImageUrl(banner);
-      if (ok) verifiedBanners.push(banner);
     }
 
-    const verifiedTrustIcons: string[] = [];
-    for (const icon of allImages.trustIcons.slice(0, 4)) {
-      const ok = await checkImageUrl(icon);
-      if (ok) verifiedTrustIcons.push(icon);
-    }
+    // ═══════════════════════════════════════════════
+    // STEP 6: Extract navigation categories
+    // ═══════════════════════════════════════════════
+    const categories = extractCategories($, baseOrigin);
 
     const brandData = {
       url: targetUrl,
@@ -233,14 +244,22 @@ export async function POST(request: Request) {
       logo,
       colors,
       fonts,
+      brandTone,
+      categories,
       products,
       description,
+      pagesScraped: {
+        homepage: true,
+        about: !!aboutHtml,
+        collections: collectionPages.length,
+        blog: !!blogHtml,
+      },
       images: {
-        banners: verifiedBanners,
+        banners: verified.banners,
         brandLogos: allImages.brandLogos.slice(0, 6),
-        trustIcons: verifiedTrustIcons,
-        blogImages: allImages.blogImages.slice(0, 4),
-        lifestyleImages: allImages.lifestyleImages.slice(0, 4),
+        trustIcons: verified.trustIcons,
+        blogImages: verified.blogImages,
+        lifestyleImages: verified.lifestyleImages,
         productImages: allImages.productImages.slice(0, 8),
       },
     };
@@ -250,6 +269,125 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : "Scraping failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+// ── Image collection from a page ──
+function collectImagesFromPage(
+  $: cheerio.CheerioAPI,
+  baseUrl: string,
+  allImages: Record<string, string[]>
+) {
+  $("img").each((_, el) => {
+    const src = $(el).attr("src");
+    if (!src) return;
+    const resolved = resolveUrl(src, baseUrl);
+
+    if (resolved.includes("loader") || resolved.includes("pixel") || resolved.includes("tracking") || resolved.includes("1x1") || resolved.includes("spacer")) return;
+
+    if (isBannerImage(resolved)) {
+      if (!allImages.banners.includes(resolved)) allImages.banners.push(resolved);
+    } else if (isBrandLogo(resolved)) {
+      if (!allImages.brandLogos.includes(resolved)) allImages.brandLogos.push(resolved);
+    } else if (isTrustIcon(resolved)) {
+      if (!allImages.trustIcons.includes(resolved)) allImages.trustIcons.push(resolved);
+    } else if (resolved.includes("/blog/") || resolved.includes("magefan_blog") || resolved.includes("/journal/")) {
+      if (!allImages.blogImages.includes(resolved)) allImages.blogImages.push(resolved);
+    } else if (resolved.includes("/catalog/product/")) {
+      if (!allImages.productImages.includes(resolved)) allImages.productImages.push(resolved);
+    } else if (isLikelyLifestyleImage(resolved)) {
+      if (!allImages.lifestyleImages.includes(resolved)) allImages.lifestyleImages.push(resolved);
+    }
+  });
+
+  // Also check background images in style attributes
+  $("[style]").each((_, el) => {
+    const style = $(el).attr("style") || "";
+    const bgMatch = style.match(/url\(['"]?([^'")\s]+)['"]?\)/);
+    if (bgMatch) {
+      const resolved = resolveUrl(bgMatch[1], baseUrl);
+      if (isLikelyLifestyleImage(resolved) && !allImages.lifestyleImages.includes(resolved)) {
+        allImages.lifestyleImages.push(resolved);
+      }
+    }
+  });
+}
+
+function isBannerImage(url: string): boolean {
+  const lower = url.toLowerCase();
+  return (
+    (lower.includes("/wysiwyg/") || lower.includes("/banner")) &&
+    (lower.includes("banner") || lower.includes("skinny") || lower.includes("hero") || lower.includes("steal") || lower.includes("playoff") || lower.includes("deal") || lower.includes("promo") || lower.includes("sale") || lower.includes("offer") || lower.includes("1520x") || lower.includes("1070x") || lower.includes("slider"))
+  );
+}
+
+function isBrandLogo(url: string): boolean {
+  const lower = url.toLowerCase();
+  return lower.includes("radiobutton") || lower.includes("brand-logo") || (lower.includes("/wysiwyg/") && lower.includes("brand"));
+}
+
+function isTrustIcon(url: string): boolean {
+  const lower = url.toLowerCase();
+  return (
+    lower.includes("about-us") || lower.includes("about_us") || lower.includes("usp") ||
+    lower.includes("trust") || lower.includes("competitive") || lower.includes("product_range") ||
+    lower.includes("shopping_experience") || lower.includes("guarantee") || lower.includes("about-quote")
+  );
+}
+
+function isLikelyLifestyleImage(url: string): boolean {
+  const lower = url.toLowerCase();
+  if (lower.includes("icon") || lower.includes("logo") || lower.includes("loader") || lower.includes(".svg") || lower.includes("pixel")) return false;
+  return (
+    (lower.includes("/wysiwyg/") || lower.includes("/media/")) &&
+    (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".webp")) &&
+    !lower.includes("/catalog/product/")
+  );
+}
+
+function detectBrandTone(colors: string[], bodyBg: string | null, description: string): string {
+  const desc = description.toLowerCase();
+  const allColors = [...colors, bodyBg ? `#${bodyBg}` : ""].filter(Boolean);
+
+  // Check for warm tones (beauty, luxury)
+  const hasWarmTones = allColors.some((c) => {
+    const r = parseInt(c.slice(1, 3), 16);
+    const g = parseInt(c.slice(3, 5), 16);
+    const b = parseInt(c.slice(5, 7), 16);
+    return r > 180 && g < 160 && b < 160; // pinkish/coral/red warm
+  });
+
+  if (desc.includes("beauty") || desc.includes("skincare") || desc.includes("cosmetic") || desc.includes("makeup") || hasWarmTones) {
+    return "beauty/luxury — use elegant serif headings (Georgia), warm palette, soft rounded corners, lifestyle-forward imagery";
+  }
+  if (desc.includes("fashion") || desc.includes("clothing") || desc.includes("apparel")) {
+    return "fashion — use clean sans-serif, high-contrast, editorial style, large lifestyle photography";
+  }
+  if (desc.includes("food") || desc.includes("gourmet") || desc.includes("chocolate") || desc.includes("coffee")) {
+    return "food/gourmet — use warm tones, rich photography, appetite-appeal copy, recipe/pairing suggestions";
+  }
+  if (desc.includes("tech") || desc.includes("electronics") || desc.includes("software")) {
+    return "tech — use clean sans-serif, cool blue/gray palette, specs-focused product cards, minimal design";
+  }
+  if (desc.includes("sport") || desc.includes("fitness") || desc.includes("outdoor")) {
+    return "sport/active — use bold sans-serif, high-energy colors, action photography, performance stats";
+  }
+  if (desc.includes("nicotine") || desc.includes("pouch") || desc.includes("tobacco") || desc.includes("vape")) {
+    return "nicotine/tobacco — use bold sans-serif (Montserrat), earthy green/brown tones, include nicotine warning, bulk pricing focus";
+  }
+  return "general e-commerce — use clean professional sans-serif, brand accent color for hero, clean white product sections";
+}
+
+function extractCategories($: cheerio.CheerioAPI, baseOrigin: string): string[] {
+  const categories: string[] = [];
+  // Look in nav, header menus
+  $("nav a, header a, .menu a, .nav a, [class*='menu'] a, [class*='nav'] a").each((_, el) => {
+    const text = $(el).text().trim();
+    const href = $(el).attr("href") || "";
+    if (text && text.length > 2 && text.length < 40 && href.includes("/") && !href.includes("account") && !href.includes("cart") && !href.includes("login")) {
+      if (!categories.includes(text)) categories.push(text);
+    }
+  });
+  return categories.slice(0, 10);
 }
 
 function extractCompanyName($: cheerio.CheerioAPI, url: string): string {
@@ -288,12 +426,12 @@ function extractColors($: cheerio.CheerioAPI, html: string): string[] {
   const colorCounts: Record<string, number> = {};
   for (const hex of hexMatches) {
     const lower = hex.toLowerCase();
-    if (["#000000", "#ffffff", "#333333", "#666666", "#999999", "#cccccc", "#f5f5f5", "#e5e5e5", "#f3f3f3", "#111111"].includes(lower)) continue;
+    if (["#000000", "#ffffff", "#333333", "#666666", "#999999", "#cccccc", "#f5f5f5", "#e5e5e5", "#f3f3f3", "#111111", "#222222", "#aaaaaa", "#eeeeee", "#dddddd", "#bbbbbb"].includes(lower)) continue;
     colorCounts[lower] = (colorCounts[lower] || 0) + 1;
   }
-  const sorted = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([color]) => color);
+  const sorted = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([color]) => color);
   for (const c of sorted) colors.add(c);
-  return Array.from(colors).slice(0, 6);
+  return Array.from(colors).slice(0, 8);
 }
 
 function extractFonts($: cheerio.CheerioAPI, html: string): string[] {
@@ -303,46 +441,50 @@ function extractFonts($: cheerio.CheerioAPI, html: string): string[] {
     const familyMatch = href.match(/family=([^&:]+)/g);
     if (familyMatch) {
       for (const m of familyMatch) {
-        const name = m.replace("family=", "").replace(/\+/g, " ").split(":")[0];
-        fonts.add(name);
+        const fontName = m.replace("family=", "").replace(/\+/g, " ").split(":")[0];
+        fonts.add(fontName);
       }
     }
   });
   const fontFamilyMatches = html.match(/font-family:\s*['"]?([^'";,}]+)/gi) || [];
   for (const match of fontFamilyMatches) {
     const font = match.replace(/font-family:\s*/i, "").replace(/['"]/g, "").trim();
-    if (font && !["arial", "helvetica", "sans-serif", "serif", "monospace", "inherit", "initial"].includes(font.toLowerCase())) {
+    if (font && !["arial", "helvetica", "sans-serif", "serif", "monospace", "inherit", "initial", "system-ui", "-apple-system"].includes(font.toLowerCase())) {
       fonts.add(font);
     }
   }
   return Array.from(fonts).slice(0, 4);
 }
 
-function extractProducts($: cheerio.CheerioAPI, baseUrl: string): Array<{ name: string; image: string | null; price: string | null }> {
-  const products: Array<{ name: string; image: string | null; price: string | null }> = [];
+function extractProducts($: cheerio.CheerioAPI, baseUrl: string): Array<{ name: string; image: string | null; price: string | null; url: string | null }> {
+  const products: Array<{ name: string; image: string | null; price: string | null; url: string | null }> = [];
   const selectors = [".product-card", ".product-item", '[class*="product"]', '[class*="ProductCard"]', ".grid-item", ".collection-product"];
   for (const sel of selectors) {
-    $(sel).slice(0, 8).each((_, el) => {
-      const rawName = $(el).find('[class*="title"], [class*="name"], h3, h4').first().text().trim() || $(el).find("a").first().text().trim();
+    $(sel).slice(0, 12).each((_, el) => {
+      const rawName = $(el).find('[class*="title"], [class*="name"], h3, h4, h2').first().text().trim() || $(el).find("a").first().text().trim();
       const name = rawName.replace(/\s+/g, " ").trim();
       const image = $(el).find("img").first().attr("src");
       const priceText = $(el).find('[class*="price"]').first().text().trim() || null;
+      const productLink = $(el).find("a").first().attr("href") || null;
+
       let cleanPrice = priceText;
       if (cleanPrice) {
-        const priceMatch = cleanPrice.match(/\$[\d,.]+/);
+        const priceMatch = cleanPrice.match(/[\$€£][\d,.]+/);
         cleanPrice = priceMatch ? priceMatch[0] : null;
       }
+
       if (name && name.length > 2 && name.length < 80) {
         products.push({
           name,
           image: image ? resolveUrl(image, baseUrl) : null,
           price: cleanPrice,
+          url: productLink ? resolveUrl(productLink, baseUrl) : null,
         });
       }
     });
     if (products.length > 0) break;
   }
-  return products.slice(0, 8);
+  return products.slice(0, 12);
 }
 
 function extractDescription($: cheerio.CheerioAPI): string {
