@@ -151,21 +151,27 @@ Choose the ${count} most impactful email types for this type of business.
 
 IMPORTANT: Return ONLY valid JSON — no markdown, no code fences, no explanation. Just the JSON array.`;
 
-    const message = await client.messages.create({
+    // Use streaming to avoid timeout on long generations
+    let fullText = "";
+    const stream = await client.messages.stream({
       model: "claude-sonnet-4-20250514",
       max_tokens: 32000,
       messages: [{ role: "user", content: userPrompt }],
       system: systemPrompt,
     });
 
-    // Extract text from response
-    const textBlock = message.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+        fullText += event.delta.text;
+      }
+    }
+
+    if (!fullText.trim()) {
       throw new Error("No text in Claude response");
     }
 
     // Parse JSON from response — handle potential markdown wrapping
-    let jsonStr = textBlock.text.trim();
+    let jsonStr = fullText.trim();
     if (jsonStr.startsWith("```")) {
       jsonStr = jsonStr.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
     }
