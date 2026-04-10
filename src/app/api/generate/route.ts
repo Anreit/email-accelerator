@@ -121,13 +121,20 @@ Return a JSON array with ${count} objects. Each object has:
 
 Choose the ${count} most impactful email types for this type of business.
 
+BEFORE writing HTML, think through these stages:
+1. BRAND AUDIT — what's this brand's voice, visual style, audience, CTA language?
+2. EMAIL STRATEGY — what layout archetype fits? What module structure?
+3. ART DIRECTION — which scraped images go where? What font pairing? What color palette? What border-radius?
+4. Then BUILD the HTML applying all of the above.
+
 IMPORTANT: Return ONLY valid JSON — no markdown, no code fences, no explanation. Just the JSON array.`;
 
-    // Use streaming to avoid timeout on long generations
+    // Use streaming with extended thinking so the model can do brand audit + strategy + art direction internally
     let fullText = "";
     const stream = await client.messages.stream({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 32000,
+      max_tokens: 16000,
+      thinking: { type: "enabled", budget_tokens: 10000 },
       messages: [{ role: "user", content: userPrompt }],
       system: systemPrompt,
     });
