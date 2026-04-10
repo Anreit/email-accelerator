@@ -15,6 +15,7 @@ export default function Home() {
   const [url, setUrl] = useState("");
   const [emailCount, setEmailCount] = useState(4);
   const [context, setContext] = useState("");
+  const [beforeImage, setBeforeImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<string | null>(null);
   const [emails, setEmails] = useState<GeneratedEmail[]>([]);
@@ -164,7 +165,7 @@ export default function Home() {
           scandiweb &middot; Email Accelerator
         </div>
         <div className="text-xs" style={{ color: "var(--dark-gray)" }}>
-          Powered by Claude AI
+          Internal tool
         </div>
       </header>
 
@@ -235,7 +236,7 @@ export default function Home() {
                 Number of emails
               </label>
               <div className="flex gap-2">
-                {[2, 3, 4, 5, 6].map((n) => (
+                {[1, 2, 3, 4, 5, 6].map((n) => (
                   <button
                     key={n}
                     onClick={() => setEmailCount(n)}
@@ -278,6 +279,55 @@ export default function Home() {
                   border: "1px solid rgba(255,255,255,0.1)",
                 }}
               />
+            </div>
+
+            {/* Before screenshot upload */}
+            <div className="mb-8">
+              <label
+                className="block text-xs font-semibold mb-2 tracking-wide uppercase"
+                style={{ color: "var(--dark-gray)" }}
+              >
+                Current email screenshot{" "}
+                <span className="normal-case tracking-normal font-normal">
+                  (optional — for before/after comparison)
+                </span>
+              </label>
+              <label
+                className="flex items-center justify-center gap-3 w-full py-4 rounded-lg cursor-pointer transition-all"
+                style={{
+                  background: beforeImage ? "rgba(63,74,175,0.1)" : "rgba(255,255,255,0.05)",
+                  border: `1px dashed ${beforeImage ? "var(--blue)" : "rgba(255,255,255,0.15)"}`,
+                  color: beforeImage ? "var(--blue)" : "var(--dark-gray)",
+                }}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (ev) => setBeforeImage(ev.target?.result as string);
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                />
+                {beforeImage ? (
+                  <span className="text-sm font-semibold">✓ Screenshot uploaded — will show before/after</span>
+                ) : (
+                  <span className="text-sm">Drop or click to upload their current email</span>
+                )}
+              </label>
+              {beforeImage && (
+                <button
+                  onClick={() => setBeforeImage(null)}
+                  className="text-xs mt-2 cursor-pointer"
+                  style={{ color: "var(--dark-gray)" }}
+                >
+                  Remove
+                </button>
+              )}
             </div>
 
             {/* Generate button */}
@@ -332,48 +382,6 @@ export default function Home() {
             )}
           </div>
 
-          {/* Features */}
-          <div className="grid grid-cols-3 gap-6 mt-16 max-w-2xl">
-            {[
-              {
-                icon: "1",
-                title: "Paste URL",
-                desc: "We scrape logo, colors, fonts, products",
-              },
-              {
-                icon: "2",
-                title: "AI generates",
-                desc: "Production-ready HTML with real content",
-              },
-              {
-                icon: "3",
-                title: "Use immediately",
-                desc: "Download HTML or preview in browser",
-              },
-            ].map((f) => (
-              <div key={f.icon} className="text-center">
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 text-sm font-bold"
-                  style={{
-                    fontFamily: "var(--font-heading)",
-                    background: "rgba(63,74,175,0.15)",
-                    color: "var(--blue)",
-                  }}
-                >
-                  {f.icon}
-                </div>
-                <div
-                  className="text-sm font-bold mb-1"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  {f.title}
-                </div>
-                <div className="text-xs" style={{ color: "var(--dark-gray)" }}>
-                  {f.desc}
-                </div>
-              </div>
-            ))}
-          </div>
         </main>
       )}
 
@@ -437,7 +445,7 @@ export default function Home() {
           {/* Active email preview */}
           {emails[activeTab] && (
             <div className="flex flex-col items-center py-10 px-6">
-              <div className="mb-4 text-center">
+              <div className="mb-6 text-center">
                 <div
                   className="text-lg font-bold"
                   style={{ fontFamily: "var(--font-heading)" }}
@@ -452,16 +460,49 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Phone mockup */}
-              <div className="phone-mockup">
-                <div className="phone-screen">
-                  <div className="phone-status-bar">9:41</div>
-                  <div className="phone-scroll">
-                    <iframe
-                      srcDoc={emails[activeTab].html}
-                      style={{ height: "2400px" }}
-                      title={emails[activeTab].type}
-                    />
+              {/* Before / After comparison or just After */}
+              <div className={`flex gap-8 items-start ${beforeImage ? "justify-center" : ""}`}>
+                {/* Before phone (only if screenshot uploaded) */}
+                {beforeImage && (
+                  <div className="flex flex-col items-center">
+                    <div
+                      className="inline-block px-3 py-1 rounded-full text-[10px] font-bold tracking-[1.5px] uppercase mb-4"
+                      style={{ background: "rgba(255,90,49,0.1)", color: "var(--orange)" }}
+                    >
+                      Current
+                    </div>
+                    <div className="phone-mockup">
+                      <div className="phone-screen">
+                        <div className="phone-status-bar">9:41</div>
+                        <div className="phone-scroll">
+                          <img src={beforeImage} alt="Current email" style={{ width: "100%", display: "block" }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* After phone (generated email) */}
+                <div className="flex flex-col items-center">
+                  {beforeImage && (
+                    <div
+                      className="inline-block px-3 py-1 rounded-full text-[10px] font-bold tracking-[1.5px] uppercase mb-4"
+                      style={{ background: "rgba(63,74,175,0.1)", color: "var(--blue)" }}
+                    >
+                      Proposed
+                    </div>
+                  )}
+                  <div className="phone-mockup">
+                    <div className="phone-screen">
+                      <div className="phone-status-bar">9:41</div>
+                      <div className="phone-scroll">
+                        <iframe
+                          srcDoc={emails[activeTab].html}
+                          style={{ height: "2400px" }}
+                          title={emails[activeTab].type}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -477,7 +518,7 @@ export default function Home() {
                     color: "white",
                   }}
                 >
-                  Open full email &nearr;
+                  Open full email ↗
                 </button>
                 <button
                   onClick={() => downloadHtml(emails[activeTab])}
