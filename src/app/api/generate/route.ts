@@ -18,10 +18,11 @@ type BrandData = {
 
 export async function POST(request: Request) {
   try {
-    const { brandData, emailCount, context, password } = (await request.json()) as {
+    const { brandData, emailCount, context, beforeImageContext, password } = (await request.json()) as {
       brandData: BrandData;
       emailCount: number;
       context: string;
+      beforeImageContext?: string;
       password: string;
     };
 
@@ -109,6 +110,7 @@ ${brandData.products.length > 0 ? brandData.products.map((p) => `  - ${p.name}${
 - **Images found:** ${brandData.images.slice(0, 6).join(", ") || "None"}
 
 ${context ? `## Additional context from the user:\n${context}\n` : ""}
+${beforeImageContext ? `## Before email reference:\n${beforeImageContext}\n` : ""}
 
 ## Output format
 Return a JSON array with ${count} objects. Each object has:

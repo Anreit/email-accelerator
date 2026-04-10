@@ -1,6 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+
+const LOADING_MESSAGES = [
+  "Scanning website...",
+  "Extracting brand colors...",
+  "Finding their logo...",
+  "Cataloging products...",
+  "Analyzing typography...",
+  "Studying their visual style...",
+  "Generating email layouts...",
+  "Writing compelling copy...",
+  "Adding product images...",
+  "Styling CTA buttons...",
+  "Optimizing for mobile...",
+  "Building table-based layouts...",
+  "Inlining all CSS...",
+  "Polishing the details...",
+  "Almost there...",
+];
 
 type GeneratedEmail = {
   type: string;
@@ -21,6 +39,22 @@ export default function Home() {
   const [emails, setEmails] = useState<GeneratedEmail[]>([]);
   const [activeTab, setActiveTab] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
+  const loadingInterval = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (loading) {
+      setLoadingMsgIndex(0);
+      loadingInterval.current = setInterval(() => {
+        setLoadingMsgIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+      }, 2500);
+    } else {
+      if (loadingInterval.current) clearInterval(loadingInterval.current);
+    }
+    return () => {
+      if (loadingInterval.current) clearInterval(loadingInterval.current);
+    };
+  }, [loading]);
 
   const handleLogin = async () => {
     const res = await fetch("/api/auth", {
@@ -44,7 +78,6 @@ export default function Home() {
 
     try {
       // Step 1: Scrape
-      setStep("Analyzing website...");
       const scrapeRes = await fetch("/api/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -53,8 +86,7 @@ export default function Home() {
       if (!scrapeRes.ok) throw new Error("Failed to analyze website");
       const brandData = await scrapeRes.json();
 
-      // Step 2: Generate
-      setStep("Generating email templates...");
+      // Step 2: Generate (include before image if uploaded for reference)
       const generateRes = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -62,6 +94,10 @@ export default function Home() {
           brandData,
           emailCount,
           context: context.trim(),
+          beforeImage: beforeImage ? true : false,
+          beforeImageContext: beforeImage
+            ? "The user uploaded a screenshot of the client's current email. Generate templates that are a clear visual upgrade — better layout, better product presentation, better CTAs. Make the improvement obvious."
+            : undefined,
           password,
         }),
       });
@@ -70,10 +106,8 @@ export default function Home() {
 
       setEmails(generated);
       setActiveTab(0);
-      setStep(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
-      setStep(null);
     } finally {
       setLoading(false);
     }
@@ -362,7 +396,9 @@ export default function Home() {
                       strokeLinecap="round"
                     />
                   </svg>
-                  {step}
+                  <span key={loadingMsgIndex} className="step-animate">
+                    {LOADING_MESSAGES[loadingMsgIndex]}
+                  </span>
                 </span>
               ) : (
                 "Generate Emails"
