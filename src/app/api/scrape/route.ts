@@ -211,18 +211,25 @@ function extractProducts(
     $(sel)
       .slice(0, 8)
       .each((_, el) => {
-        const name =
+        const rawName =
           $(el).find('[class*="title"], [class*="name"], h3, h4').first().text().trim() ||
           $(el).find("a").first().text().trim();
+        const name = rawName.replace(/\s+/g, " ").trim();
         const image = $(el).find("img").first().attr("src");
         const priceText =
           $(el).find('[class*="price"]').first().text().trim() || null;
 
         if (name && name.length > 2 && name.length < 100) {
+          // Clean up price — extract just the dollar amount
+          let cleanPrice = priceText;
+          if (cleanPrice) {
+            const priceMatch = cleanPrice.match(/\$[\d,.]+/);
+            cleanPrice = priceMatch ? priceMatch[0] : null;
+          }
           products.push({
-            name,
+            name: name.replace(/\s+/g, " ").trim(),
             image: image ? resolveUrl(image, baseUrl) : null,
-            price: priceText,
+            price: cleanPrice,
           });
         }
       });
