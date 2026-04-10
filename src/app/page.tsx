@@ -46,8 +46,12 @@ export default function Home() {
     if (loading) {
       setLoadingMsgIndex(0);
       loadingInterval.current = setInterval(() => {
-        setLoadingMsgIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
-      }, 2500);
+        setLoadingMsgIndex((prev) => {
+          // Stop at "Almost there..." (last message)
+          if (prev >= LOADING_MESSAGES.length - 1) return prev;
+          return prev + 1;
+        });
+      }, 4000);
     } else {
       if (loadingInterval.current) clearInterval(loadingInterval.current);
     }
