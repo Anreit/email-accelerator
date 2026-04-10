@@ -13,7 +13,14 @@ type BrandData = {
   fonts: string[];
   products: Array<{ name: string; image: string | null; price: string | null }>;
   description: string;
-  images: string[];
+  images: {
+    banners?: string[];
+    brandLogos?: string[];
+    trustIcons?: string[];
+    blogImages?: string[];
+    lifestyleImages?: string[];
+    productImages?: string[];
+  } | string[];
 };
 
 export async function POST(request: Request) {
@@ -289,7 +296,11 @@ IMPORTANT: The HTML above is the GOLD STANDARD. Your output MUST match this leve
 - **Fonts:** ${brandData.fonts.length > 0 ? brandData.fonts.join(", ") : "Use Arial/Helvetica"}
 - **Products found:**
 ${brandData.products.length > 0 ? brandData.products.map((p) => `  - ${p.name}${p.price ? ` (${p.price})` : ""}${p.image ? ` [img: ${p.image}]` : ""}`).join("\n") : "  - No products scraped, generate appropriate content based on the brand"}
-- **Images found:** ${brandData.images.slice(0, 6).join(", ") || "None"}
+- **Banner images (use for full-width sections):** ${!Array.isArray(brandData.images) && brandData.images?.banners ? brandData.images.banners.join(", ") : "None found"}
+- **Brand/category logos:** ${!Array.isArray(brandData.images) && brandData.images?.brandLogos ? brandData.images.brandLogos.join(", ") : "None found"}
+- **Trust/about icons:** ${!Array.isArray(brandData.images) && brandData.images?.trustIcons ? brandData.images.trustIcons.join(", ") : "None found"}
+- **Blog/lifestyle images:** ${!Array.isArray(brandData.images) && brandData.images?.blogImages ? brandData.images.blogImages.join(", ") : "None found"}
+- **Other lifestyle images:** ${!Array.isArray(brandData.images) && brandData.images?.lifestyleImages ? brandData.images.lifestyleImages.join(", ") : "None found"}
 
 ${context ? `## Additional context from the user:\n${context}\n` : ""}
 ${beforeImageContext ? `## Before email reference:\n${beforeImageContext}\n` : ""}
